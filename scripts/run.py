@@ -10,7 +10,7 @@ import torch
 import sys
 import os
 
-from src.gpu_selector import auto_choose_cuda_device
+from src.gpu_selector import auto_choose_gpu
 from src.compile_guard import import_model_new
 from src.benchmark import test_correctness, test_performance, profile_model_new
 from src.path_bootstrap import ensure_solution_dir_on_path
@@ -25,7 +25,7 @@ TEST_ITERATIONS = {"full": 1000, "quick": 100, "correctness": 0}
 # -----------------
 
 # Must set CUDA_VISIBLE_DEVICES before any CUDA initialization (including load_inline)
-auto_choose_cuda_device()
+auto_choose_gpu()
 
 # Import ModelNew with compile timeout protection
 ModelNew = import_model_new(timeout=COMPILE_TIMEOUT)
