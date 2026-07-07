@@ -6,9 +6,8 @@ Test runner for Model vs ModelNew.
 3. Profile ModelNew — identify bottlenecks
 """
 
-import torch
-import sys
 import os
+import torch
 
 from src.gpu_selector import auto_choose_gpu
 from src.compile_guard import import_model_new
@@ -36,6 +35,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", choices=["full", "quick", "correctness"], default="full",
     help="full=1000iter+profiling(default), quick=100iter无profiling, correctness=仅正确性")
     args = parser.parse_args()
+    compare_torch_compile = os.environ.get("COMPARE_TORCH_COMPILE", "0") == "1"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -49,10 +49,12 @@ if __name__ == "__main__":
     # 同步权重：Model 与 ModelNew 结构一致，直接按同名参数复制
     model_new.load_state_dict(model.state_dict())
 
-    # torch.compile 版本（首次调用时触发追踪/编译，warmup 阶段会完成）
-    print("正在创建 model_compile (torch.compile)...")
-    model_compile = torch.compile(model)
-    model_compile.eval()
+    # 默认跳过 torch.compile 对比；只有显式打开环境变量时才创建 compiled baseline。
+    model_compile = None
+    if compare_torch_compile:
+        print("检测到 COMPARE_TORCH_COMPILE=1，正在创建 model_compile (torch.compile)...")
+        model_compile = torch.compile(model)
+        model_compile.eval()
 
     inputs = [x.to(device) for x in get_inputs()]
 
@@ -78,7 +80,9 @@ if __name__ == "__main__":
         exit(1)
 
     model_time, model_new_time, model_compile_time, speedup = perf_result
-    del model, model_compile
+    del model
+    if model_compile is not None:
+        del model_compile
     torch.cuda.empty_cache()
 
     # 3. Profiling
@@ -92,7 +96,11 @@ if __name__ == "__main__":
         f"FINAL_SPEED_RESULT: "
         f"model={model_time * 1000:.6f} ms, "
         f"model_new={model_new_time * 1000:.6f} ms, "
-        f"model_compile={model_compile_time * 1000:.6f} ms, "
-        f"speedup(compile/base)={model_time / model_compile_time:.2f}x, "
         f"speedup(new/base)={speedup:.2f}x"
     )
+    if model_compile_time is not None:
+        print(
+            f"FINAL_COMPILE_RESULT: "
+            f"model_compile={model_compile_time * 1000:.6f} ms, "
+            f"speedup(compile/base)={model_time / model_compile_time:.2f}x"
+        )

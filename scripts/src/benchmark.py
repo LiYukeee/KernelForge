@@ -49,19 +49,22 @@ def _bench_single(m, inputs, name, iterations, warmup_times=20):
 
 
 def test_performance(model, model_new, model_compile, inputs, iterations=1000, warmup_times=20):
-    """Benchmark all three models and compute speedup ratios."""
+    """Benchmark baseline and optimized models, with optional torch.compile comparison."""
     try:
         print(f"正在进行性能测试 (迭代次数: {iterations})...")
 
         model_time         = _bench_single(model,         inputs, "Model",            iterations, warmup_times)
         model_new_time     = _bench_single(model_new,     inputs, "ModelNew",         iterations, warmup_times)
-        model_compile_time = _bench_single(model_compile, inputs, "Model (compiled)", iterations, warmup_times)
+        model_compile_time = None
+        if model_compile is not None:
+            model_compile_time = _bench_single(model_compile, inputs, "Model (compiled)", iterations, warmup_times)
 
         baseline = model_time
         speedup  = baseline / model_new_time
         print(f"\n加速比汇总（以 Model 为基准）:")
         print(f"  ModelNew:              {speedup:.2f}x")
-        print(f"  Model (compiled):      {baseline / model_compile_time:.2f}x")
+        if model_compile_time is not None:
+            print(f"  Model (compiled):      {baseline / model_compile_time:.2f}x")
 
         return model_time, model_new_time, model_compile_time, speedup
     except Exception as e:
@@ -78,7 +81,8 @@ def profile_model_new(model_new, inputs, profile_output=None):
             torch.profiler.ProfilerActivity.CUDA,
         ],
         record_shapes=True,
-        with_stack=True
+        with_stack=True,
+        acc_events=False
     ) as prof:
         for _ in range(10):
             model_new(*inputs)
