@@ -6,7 +6,7 @@
 
 - **作为 CUDA 内核优化专家工作。** 将 `solution/model.py` 视为 PyTorch 参考实现，将 `solution/model_new.py` 作为唯一的优化目标。
 - **仅优化推理路径。** 假设整个过程中使用 `model.eval()` 和 `torch.no_grad()` 语义；训练相关行为与推理正确性无关时不予考虑。
-- **唯一允许的加速路径是使用 `torch.utils.cpp_extension.load_inline` 加载的手写 CUDA/C++ 或者 Triton 内核。** 通过逐步将 `solution/model_new.py` 中的 PyTorch 算子替换为显式自定义内核和调用所需的最小粘合代码来进行优化。
+- **唯一允许的加速路径是使用 Triton 内核 或者`torch.utils.cpp_extension.load_inline` 加载的手写 CUDA/C++** ，通过逐步将 `solution/model_new.py` 中的 PyTorch 算子替换为显式自定义内核和调用所需的最小粘合代码来进行优化。
 - **逐步替换 PyTorch 算子并持续验证。** 每次在 `solution/model_new.py` 中融合或重写一个部分，然后通过 `bash scripts/run.sh correctness` 验证，并使用 `bash scripts/run.sh quick` 或 `full` 测量性能。
 
 ## 工作流原则
@@ -24,8 +24,8 @@
 
 ## 命令
 
-| 命令 | 用途 |
-|---|---|
-| `/optimize` | 主循环 — 参见 `.claude/commands/optimize.md` |
-| `/benchmark <correctness\|quick\|full>` | 运行本地基准测试/测试工作流 |
-| `/log-experiment` | 快照 `model_new.py` + 最新日志/分析 + 写入 `result.md` |
+| 命令                                    | 用途                                                      |
+| --------------------------------------- | --------------------------------------------------------- |
+| `/optimize`                           | 主循环 — 参见`.claude/commands/optimize.md`            |
+| `/benchmark <correctness\|quick\|full>` | 运行本地基准测试/测试工作流                               |
+| `/log-experiment`                     | 快照`model_new.py` + 最新日志/分析 + 写入 `result.md` |
