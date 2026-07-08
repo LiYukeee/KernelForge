@@ -7,21 +7,42 @@ Must be called before any CUDA initialization (including load_inline).
 import os
 import re
 import subprocess
+import traceback
 
 import numpy as np
+
+
+def _print_auto_choose_error(device_type, exc):
+    print(f'--- Failed to auto choose {device_type} device: {exc} ---')
+    if isinstance(exc, subprocess.CalledProcessError):
+        if exc.stdout:
+            print(f'--- {device_type} stdout ---')
+            print(exc.stdout)
+        if exc.stderr:
+            print(f'--- {device_type} stderr ---')
+            print(exc.stderr)
+    print(traceback.format_exc())
 
 
 def auto_choose_cuda_device():
     """Query GPU memory usage via nvidia-smi and pick the least used device."""
     try:
         cmd = 'nvidia-smi -q -d Memory |grep -A4 GPU|grep Used'
-        result = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE).stdout.decode().split('\n')
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
         os.environ['CUDA_VISIBLE_DEVICES'] = str(
-            np.argmin([int(x.split()[2]) for x in result[:-1]])
+            np.argmin([int(x.split()[2]) for x in result if x.strip()])
         )
         print(f'--- Auto chose CUDA device {os.environ["CUDA_VISIBLE_DEVICES"]} ---')
-    except Exception:
-        print('--- Failed to auto choose CUDA device, using default ---')
+    except Exception as exc:
+        _print_auto_choose_error('CUDA', exc)
+
 
 def auto_choose_maca_device():
     """Query GPU memory usage via mx-smi --show-memory and pick the least used device."""
@@ -29,7 +50,7 @@ def auto_choose_maca_device():
         result = subprocess.run(
             ['mx-smi', '--show-memory'],
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
             check=True,
         ).stdout.splitlines()
@@ -67,7 +88,6 @@ def auto_choose_maca_device():
                 continue
 
             used_kb = int(mem_match.group(1))
-            block_memories[current_gpu] = used_kb
             devices.append(current_gpu)
             memory_used.append(used_kb)
             current_gpu = None
@@ -79,10 +99,10 @@ def auto_choose_maca_device():
         best = devices[int(np.argmin(memory_used))]
         os.environ['MACA_VISIBLE_DEVICES'] = str(best)
         print(f'--- Auto chose MACA device {best} ---')
-    except Exception:
-        print('--- Failed to auto choose MACA device, using default ---')
+    except Exception as exc:
+        _print_auto_choose_error('MACA', exc)
 
 def auto_choose_gpu():
     """Auto-select the GPU device with the most free memory."""
-    auto_choose_cuda_device()
+    # auto_choose_cuda_device()
     auto_choose_maca_device()
