@@ -5,6 +5,7 @@ Must be called before any CUDA initialization (including load_inline).
 """
 
 import os
+import re
 import subprocess
 
 import numpy as np
@@ -23,34 +24,54 @@ def auto_choose_cuda_device():
         print('--- Failed to auto choose CUDA device, using default ---')
 
 def auto_choose_maca_device():
-    """Query GPU memory usage via mx-smi and pick the least used device."""
+    """Query GPU memory usage via mx-smi --show-memory and pick the least used device."""
     try:
         result = subprocess.run(
-            ['mx-smi'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True
+            ['mx-smi', '--show-memory'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            check=True,
         ).stdout.splitlines()
 
         devices = []
         memory_used = []
         current_gpu = None
+        in_memory_block = False
 
         for line in result:
             line = line.strip()
-            if not line.startswith('|'):
+            if not line:
                 continue
 
-            gpu_match = re.match(r'^\|\s*(\d+)\b', line)
+            gpu_match = re.match(r'^GPU#(\d+)\b', line)
             if gpu_match:
                 current_gpu = int(gpu_match.group(1))
+                in_memory_block = False
                 continue
 
             if current_gpu is None:
                 continue
 
-            mem_match = re.search(r'(\d+)\s*/\s*\d+\s*MiB', line)
-            if mem_match:
-                devices.append(current_gpu)
-                memory_used.append(int(mem_match.group(1)))
-                current_gpu = None
+            if line == 'Memory':
+                in_memory_block = True
+                continue
+
+            if not in_memory_block:
+                continue
+
+            mem_match = re.search(r'vis_vram used\s*:\s*(\d+)\s*KB', line, re.IGNORECASE)
+            if not mem_match:
+                mem_match = re.search(r'vram used\s*:\s*(\d+)\s*KB', line, re.IGNORECASE)
+            if not mem_match:
+                continue
+
+            used_kb = int(mem_match.group(1))
+            block_memories[current_gpu] = used_kb
+            devices.append(current_gpu)
+            memory_used.append(used_kb)
+            current_gpu = None
+            in_memory_block = False
 
         if not devices:
             raise ValueError('No GPU memory usage data found')
