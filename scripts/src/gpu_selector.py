@@ -6,6 +6,7 @@ Must be called before any CUDA initialization (including load_inline).
 
 import os
 import re
+import shutil
 import subprocess
 import traceback
 
@@ -104,5 +105,7 @@ def auto_choose_maca_device():
 
 def auto_choose_gpu():
     """Auto-select the GPU device with the most free memory."""
-    # auto_choose_cuda_device()
-    auto_choose_maca_device()
+    if shutil.which('nvidia-smi'):
+        auto_choose_cuda_device()
+    if shutil.which('mx-smi'):
+        auto_choose_maca_device()

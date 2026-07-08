@@ -82,7 +82,7 @@ def profile_model_new(model_new, inputs, profile_output=None):
         ],
         record_shapes=True,
         with_stack=True,
-        acc_events=False
+        acc_events=True
     ) as prof:
         for _ in range(10):
             model_new(*inputs)

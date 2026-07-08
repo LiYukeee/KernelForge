@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/env_metax.sh"
+ENV_FILE="$SCRIPT_DIR/env.sh"
 
 # 在脚本最开始加载环境变量，确保后续参数解析和命令执行都使用统一环境。
 if [[ ! -f "$ENV_FILE" ]]; then
