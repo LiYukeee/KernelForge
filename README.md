@@ -10,13 +10,15 @@ KernelForge/
 │   ├── model.py          # PyTorch 基线参考（不可编辑）
 │   └── model_new.py      # 优化目标（唯一可编辑文件）
 ├── scripts/
-│   ├── run.sh            # 入口脚本（环境配置 + 调用 run.py）
+│   ├── env.sh            # 运行环境配置（CUDA/MACA、Python 路径、torch.compile 对比开关）
+│   ├── run.sh            # 入口脚本（加载 env.sh + 调用 run.py + 写入最新日志）
 │   ├── run.py            # 测试运行器（正确性 / 性能 / profiling）
 │   └── src/
+│       ├── __init__.py   # Python 包标记
 │       ├── benchmark.py  # 正确性验证、性能测试、profiling 工具
-│       ├── compile_guard.py  # 编译超时保护（默认 300s）
-│       ├── gpu_selector.py   # 自动选择空闲 GPU
-│       └── path_bootstrap.py # 路径初始化
+│       ├── compile_guard.py  # ModelNew 编译超时保护与缓存清理
+│       ├── gpu_selector.py   # 自动选择空闲 CUDA/MACA GPU
+│       └── path_bootstrap.py # 将 solution/ 加入 Python import 路径
 ├── experiments/          # 实验记录（由 /log-experiment 创建）
 ├── CLAUDE.md             # 项目指令（Claude Code 读取）
 └── .claude/
@@ -99,4 +101,4 @@ bash scripts/run.sh full           # 正确性 + 性能（1000 次迭代）+ pro
 - PyTorch (CUDA 版本)
 - Python 3.10+
 
-环境配置在 `scripts/run.sh` 中，如需修改请调整该文件顶部的变量。
+环境配置集中维护在 `scripts/env.sh` 中，包括 CUDA/MACA 路径、Python 解释器路径以及 `COMPARE_TORCH_COMPILE` 开关。`scripts/run.sh` 会在启动时加载该文件。
