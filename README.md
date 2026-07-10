@@ -1,5 +1,8 @@
 # KernelForge
 
+<!-- [![KernelForge Project Page Preview](./assets/project-page-preview.png)](https://liyuke.cn/KernelForge_Page/) -->
+[Project Page](https://liyuke.cn/KernelForge_Page/)
+
 基于 Claude Code 的自主 CUDA 算子优化系统。通过 `/optimize` 命令驱动迭代优化循环，将 PyTorch 参考实现逐步替换为高性能自定义内核。
 
 ## 项目结构
@@ -35,6 +38,7 @@ KernelForge/
 ### 1. 准备算子
 
 将 KernelBench 中的算子模板复制到 `solution/` 目录：
+
 - `model.py` — PyTorch 参考实现（基线，不可编辑）
 - `model_new.py` — 优化目标（初始与 model.py 相同）
 
@@ -53,7 +57,7 @@ bash scripts/run.sh full           # 正确性 + 性能（1000 次迭代）+ pro
 在 Claude Code 中使用 `/optimize` 命令启动自主优化循环：
 
 ```
-/optimize
+/loop /optimize
 ```
 
 循环会自动执行：评估 → 规划 → 实现 → 验证 → 测量 → 记录 → 决策，持续迭代直到达到满意性能。
@@ -69,11 +73,11 @@ bash scripts/run.sh full           # 正确性 + 性能（1000 次迭代）+ pro
 
 ## 命令
 
-| 命令 | 用途 |
-|---|---|
-| `/optimize` | 启动自主优化循环 |
-| `/benchmark <correctness\|quick\|full>` | 运行基准测试 |
-| `/log-experiment` | 记录实验（快照 model_new.py + 日志 + result.md） |
+| 命令                                    | 用途                                             |
+| --------------------------------------- | ------------------------------------------------ |
+| `/optimize`                           | 启动自主优化循环                                 |
+| `/benchmark <correctness\|quick\|full>` | 运行基准测试                                     |
+| `/log-experiment`                     | 记录实验（快照 model_new.py + 日志 + result.md） |
 
 ## 优化规则
 
