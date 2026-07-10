@@ -1,11 +1,7 @@
 <div align="center" id="top">
 
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="./assets/project_ico%20_black.png">
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/project_ico%20_white.png">
-    <img src="./assets/project_ico%20_black.png" alt="KernelForge logo" width="120" align="middle">
-  </picture>
+  <img src="./assets/project_ico.png" alt="KernelForge logo" width="120" align="middle">
   KernelForge
 </h1>
 
