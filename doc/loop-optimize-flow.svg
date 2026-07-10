@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 2700" role="img" aria-labelledby="title desc">
+  <title id="title">Claude Code /loop /optimize Agent 自动优化流程</title>
+  <desc id="desc">展示 Claude Code 重复触发 /optimize 后，主 Agent、三个子 Agent、benchmark、实验记录和决策之间的流程。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#475569"/>
+    </marker>
+    <style>
+      .title { font: 700 38px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 20px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .boundary { font: 700 20px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .node-title { font: 700 24px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #0f172a; }
+      .node-text { font: 400 20px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #334155; }
+      .small { font: 400 18px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .branch { font: 700 18px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #475569; }
+      .start { fill: #dcfce7; stroke: #16a34a; stroke-width: 3; }
+      .external { fill: #f3e8ff; stroke: #9333ea; stroke-width: 3; }
+      .main { fill: #eff6ff; stroke: #2563eb; stroke-width: 3; }
+      .agent { fill: #fff7ed; stroke: #ea580c; stroke-width: 3; }
+      .guard { fill: #fefce8; stroke: #ca8a04; stroke-width: 3; }
+      .measure { fill: #ecfeff; stroke: #0891b2; stroke-width: 3; }
+      .record { fill: #f0fdf4; stroke: #16a34a; stroke-width: 3; }
+      .decision { fill: #fff; stroke: #475569; stroke-width: 3; }
+      .arrow { fill: none; stroke: #475569; stroke-width: 3; marker-end: url(#arrow); }
+      .dashed-arrow { fill: none; stroke: #ea580c; stroke-width: 2.5; stroke-dasharray: 8 7; marker-end: url(#arrow); }
+      .divider { stroke: #cbd5e1; stroke-width: 2; stroke-dasharray: 8 8; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="2700" fill="#f8fafc"/>
+  <text x="800" y="58" text-anchor="middle" class="title">Claude Code /loop /optimize Agent 自动优化流程</text>
+  <text x="800" y="92" text-anchor="middle" class="subtitle">按需调用子 Agent，通过 benchmark 与实验产物驱动下一轮优化</text>
+
+  <rect x="40" y="120" width="1520" height="2510" rx="22" fill="#ffffff" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="12 9"/>
+  <text x="70" y="157" class="boundary">Claude Code 外部调度机制：/loop</text>
+
+  <rect x="90" y="180" width="1420" height="2400" rx="18" fill="none" stroke="#93c5fd" stroke-width="2" stroke-dasharray="8 8"/>
+  <text x="120" y="216" class="boundary">KernelForge 内部流程：/optimize 单轮闭环</text>
+
+  <rect x="570" y="250" width="460" height="76" rx="38" class="start"/>
+  <text x="800" y="297" text-anchor="middle" class="node-title">用户输入 `/loop /optimize`</text>
+
+  <path d="M 800 326 L 800 370" class="arrow"/>
+  <rect x="490" y="370" width="620" height="86" rx="14" class="external"/>
+  <text x="800" y="406" text-anchor="middle" class="node-title">`/loop` 调度器</text>
+  <text x="800" y="435" text-anchor="middle" class="node-text">重复触发 `/optimize`，调度机制由 Claude Code 提供</text>
+
+  <path d="M 800 456 L 800 500" class="arrow"/>
+  <rect x="430" y="500" width="740" height="110" rx="14" class="main"/>
+  <text x="800" y="540" text-anchor="middle" class="node-title">主 Agent 评估当前状态</text>
+  <text x="800" y="573" text-anchor="middle" class="node-text">读取 model_new.py、model.py、summary.md、LESSONS.md、相关 result.md</text>
+
+  <path d="M 800 610 L 800 650" class="arrow"/>
+  <rect x="450" y="650" width="700" height="100" rx="14" class="main"/>
+  <text x="800" y="690" text-anchor="middle" class="node-title">规划本轮唯一优化点</text>
+  <text x="800" y="722" text-anchor="middle" class="node-text">若存在未完成的 plan.md，优先实施该计划</text>
+
+  <path d="M 800 750 L 800 790" class="arrow"/>
+  <text x="800" y="784" text-anchor="middle" class="branch">按需调用：可调用 0 个、1 个或多个子 Agent</text>
+
+  <rect x="120" y="810" width="410" height="210" rx="14" class="agent"/>
+  <text x="325" y="850" text-anchor="middle" class="node-title">profiler</text>
+  <text x="145" y="887" class="node-text">触发：不知道瓶颈在哪里</text>
+  <text x="145" y="919" class="node-text">输入：profile_latest.txt</text>
+  <text x="145" y="951" class="node-text">输出：experiments/profile.md</text>
+  <text x="145" y="983" class="small">作用：定位热点与优化 lever</text>
+
+  <rect x="595" y="810" width="410" height="210" rx="14" class="agent"/>
+  <text x="800" y="850" text-anchor="middle" class="node-title">workload-inspector</text>
+  <text x="620" y="887" class="node-text">触发：目标选择或切换不明确</text>
+  <text x="620" y="919" class="node-text">分析：输入、布局、热点、历史</text>
+  <text x="620" y="951" class="node-text">输出：workload_profile.md</text>
+  <text x="620" y="983" class="small">作用：推荐下一个优化目标</text>
+
+  <rect x="1070" y="810" width="410" height="210" rx="14" class="agent"/>
+  <text x="1275" y="850" text-anchor="middle" class="node-title">research</text>
+  <text x="1095" y="887" class="node-text">触发：平台期、重复失败、方向耗尽</text>
+  <text x="1095" y="919" class="node-text">输入：代码、日志、实验历史</text>
+  <text x="1095" y="951" class="node-text">输出：exp_N/plan.md</text>
+  <text x="1095" y="983" class="small">必要时先调用 workload-inspector</text>
+
+  <path d="M 325 1020 L 325 1060 L 800 1060" class="dashed-arrow"/>
+  <path d="M 800 1020 L 800 1060" class="dashed-arrow"/>
+  <path d="M 1275 1020 L 1275 1060 L 800 1060" class="dashed-arrow"/>
+  <path d="M 800 1060 L 800 1100" class="arrow"/>
+  <rect x="450" y="1100" width="700" height="92" rx="14" class="main"/>
+  <text x="800" y="1138" text-anchor="middle" class="node-title">主 Agent 修改 `solution/model_new.py`</text>
+  <text x="800" y="1168" text-anchor="middle" class="node-text">子 Agent 不直接写优化内核</text>
+
+  <path d="M 800 1192 L 800 1232" class="arrow"/>
+  <rect x="490" y="1232" width="620" height="90" rx="14" class="guard"/>
+  <text x="800" y="1270" text-anchor="middle" class="node-title">Hook 权限检查：`pre_edit.sh`</text>
+  <text x="800" y="1300" text-anchor="middle" class="node-text">只允许修改 `model_new.py`，保护基线与 scripts/</text>
+
+  <path d="M 800 1322 L 800 1360" class="arrow"/>
+  <rect x="485" y="1360" width="630" height="92" rx="14" class="measure"/>
+  <text x="800" y="1398" text-anchor="middle" class="node-title">运行 correctness</text>
+  <text x="800" y="1428" text-anchor="middle" class="node-text">`bash scripts/run.sh correctness`，误差阈值 ≤ 1e-4</text>
+
+  <path d="M 800 1452 L 800 1490" class="arrow"/>
+  <polygon points="800,1490 965,1550 800,1610 635,1550" class="decision"/>
+  <text x="800" y="1545" text-anchor="middle" class="node-title">正确性通过？</text>
+  <text x="800" y="1575" text-anchor="middle" class="small">Yes / No</text>
+
+  <path d="M 635 1550 L 390 1550 L 390 1660" class="arrow"/>
+  <text x="520" y="1538" text-anchor="middle" class="branch">No</text>
+  <rect x="130" y="1660" width="520" height="125" rx="14" class="guard"/>
+  <text x="390" y="1700" text-anchor="middle" class="node-title">停止本轮性能测试</text>
+  <text x="390" y="1732" text-anchor="middle" class="node-text">通过 `/log-experiment` 记录失败实验</text>
+  <text x="390" y="1762" text-anchor="middle" class="small">之后回到 `/loop` 的下一轮</text>
+  <path d="M 130 1722 L 105 1722 L 105 2526 L 130 2526" class="arrow"/>
+
+  <path d="M 800 1610 L 800 1660" class="arrow"/>
+  <text x="830" y="1645" class="branch">Yes</text>
+  <rect x="485" y="1660" width="630" height="108" rx="14" class="measure"/>
+  <text x="800" y="1702" text-anchor="middle" class="node-title">运行 quick 性能测试</text>
+  <text x="800" y="1735" text-anchor="middle" class="node-text">20 次 warmup + 100 次迭代，比较 ModelNew 加速比</text>
+
+  <path d="M 800 1768 L 800 1810" class="arrow"/>
+  <polygon points="800,1810 965,1870 800,1930 635,1870" class="decision"/>
+  <text x="800" y="1865" text-anchor="middle" class="node-title">需要 full？</text>
+  <text x="800" y="1895" text-anchor="middle" class="small">噪声、异常或需要 profiling</text>
+
+  <path d="M 965 1870 L 1260 1870 L 1260 1980" class="arrow"/>
+  <text x="1080" y="1858" text-anchor="middle" class="branch">Yes</text>
+  <rect x="1030" y="1980" width="450" height="135" rx="14" class="measure"/>
+  <text x="1255" y="2020" text-anchor="middle" class="node-title">运行 full</text>
+  <text x="1255" y="2052" text-anchor="middle" class="node-text">1000 次迭代 + torch.profiler</text>
+  <text x="1255" y="2083" text-anchor="middle" class="small">生成 `profile_latest.txt`</text>
+  <path d="M 1255 2115 L 1255 2180 L 800 2180" class="arrow"/>
+
+  <path d="M 800 1930 L 800 2180" class="arrow"/>
+  <text x="830" y="2164" class="branch">No</text>
+  <rect x="485" y="2180" width="630" height="105" rx="14" class="record"/>
+  <text x="800" y="2221" text-anchor="middle" class="node-title">调用 `/log-experiment`</text>
+  <text x="800" y="2254" text-anchor="middle" class="node-text">保存代码、日志、profiling 与 `result.md`，更新 `summary.md`</text>
+
+  <path d="M 800 2285 L 800 2325" class="arrow"/>
+  <polygon points="800,2325 965,2385 800,2445 635,2385" class="decision"/>
+  <text x="800" y="2380" text-anchor="middle" class="node-title">结果决策</text>
+  <text x="800" y="2410" text-anchor="middle" class="small">保留 / 重试 / 回退 / 研究</text>
+
+  <path d="M 635 2385 L 250 2385 L 250 2490" class="arrow"/>
+  <text x="445" y="2373" text-anchor="middle" class="branch">变慢或失败：回退 / 切换</text>
+  <path d="M 710 2435 L 520 2490" class="arrow"/>
+  <text x="600" y="2472" text-anchor="middle" class="branch">小幅提升：重复确认</text>
+  <path d="M 890 2435 L 1080 2490" class="arrow"/>
+  <text x="1000" y="2472" text-anchor="middle" class="branch">明显提升：保留</text>
+  <path d="M 965 2385 L 1370 2385 L 1370 2490" class="arrow"/>
+  <text x="1170" y="2373" text-anchor="middle" class="branch">平台期：调用 research</text>
+
+  <rect x="80" y="2490" width="340" height="72" rx="14" class="main"/>
+  <text x="250" y="2535" text-anchor="middle" class="node-title">下一轮 `/loop`</text>
+  <rect x="470" y="2490" width="340" height="72" rx="14" class="main"/>
+  <text x="640" y="2535" text-anchor="middle" class="node-title">下一轮 `/loop`</text>
+  <rect x="910" y="2490" width="340" height="72" rx="14" class="main"/>
+  <text x="1080" y="2535" text-anchor="middle" class="node-title">下一轮 `/loop`</text>
+  <rect x="1260" y="2490" width="270" height="72" rx="14" class="main"/>
+  <text x="1395" y="2535" text-anchor="middle" class="node-title">下一轮</text>
+
+  <path d="M 250 2490 L 250 232 L 570 232" class="dashed-arrow"/>
+  <path d="M 640 2490 L 640 232 L 570 232" class="dashed-arrow"/>
+  <path d="M 1080 2490 L 1080 232 L 1030 232" class="dashed-arrow"/>
+  <path d="M 1395 2490 L 1395 232 L 1030 232" class="dashed-arrow"/>
+
+  <rect x="1180" y="2160" width="300" height="100" rx="14" class="guard"/>
+  <text x="1330" y="2197" text-anchor="middle" class="node-title">停止行为</text>
+  <text x="1330" y="2228" text-anchor="middle" class="small">`stop.sh` 检查未验证改动</text>
+  <text x="1330" y="2252" text-anchor="middle" class="small">只提醒，不强制阻止停止</text>
+</svg>
