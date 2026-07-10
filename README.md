@@ -1,7 +1,7 @@
-# KernelForge
+<h1 align="center">KernelForge</h1>
 
 <!-- [![KernelForge Project Page Preview](./assets/project-page-preview.png)](https://liyuke.cn/KernelForge_Page/) -->
-[Project Page](https://liyuke.cn/KernelForge_Page/)
+<h2 align="center"><a href="https://liyuke.cn/KernelForge_Page/">Project Page</a> | <a href="doc/index.md">文档</a></h2>
 
 基于 Claude Code 的自主 CUDA 算子优化系统。通过 `/optimize` 命令驱动迭代优化循环，将 PyTorch 参考实现逐步替换为高性能自定义内核。
 
