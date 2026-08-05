@@ -56,7 +56,7 @@ if __name__ == "__main__":
         model_compile = torch.compile(model)
         model_compile.eval()
 
-    inputs = [x.to(device) for x in get_inputs()]
+    inputs = [x.to(device) if isinstance(x, torch.Tensor) else x for x in get_inputs()]
 
     # 1. 正确性测试
     max_diff = test_correctness(model, model_new, inputs)
