@@ -40,7 +40,8 @@ esac
 # solution files shipped with this workspace.
 TARGET=${TARGET:-"$SCRIPT_DIR/../solution"}
 LOG_DIR="$SCRIPT_DIR/output"
-LOG_FILE="$LOG_DIR/bench_new_latest.log"
+LOG_FILE="$LOG_DIR/bench_latest.log"
+PROFILE_FILE="$LOG_DIR/profile_latest.txt"
 V0_FILE="$TARGET/model.py"
 V1_FILE="$TARGET/model_new.py"
 
@@ -60,3 +61,10 @@ export PYTHONPATH="$TARGET${PYTHONPATH:+:$PYTHONPATH}"
 	--warmup "$WARMUP" \
 	--repeat "$REPEAT" \
 	2>&1 | tee "$LOG_FILE"
+
+if [[ "$MODE" == "full" ]]; then
+	"$PYTHON_BIN" profile_model_new.py \
+		--v0_file "$V0_FILE" \
+		--v1_file "$V1_FILE" \
+		--profile-output "$PROFILE_FILE"
+fi
