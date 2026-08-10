@@ -4,32 +4,59 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/env.sh"
 
-# 在脚本最开始加载环境变量，确保后续参数解析和命令执行都使用统一环境。
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Missing env file: $ENV_FILE" >&2
-  exit 1
+	echo "Missing env file: $ENV_FILE" >&2
+	exit 1
 fi
 
-# env.sh 负责集中维护运行所需的环境变量，例如 CUDA 和 Python 路径。
 # shellcheck source=/dev/null
 source "$ENV_FILE"
 
-# 支持参数: full(默认,1000iter+profiling) / quick(100iter,无profiling) / correctness(仅正确性)
-# full 模式会将 profiling 结果持久化到 output/profile_latest.txt
+# Keep the interface consistent with run.sh. new_bench.py always measures
+# latency, so correctness mode uses one untimed-style sample after accuracy
+# validation rather than skipping its required timing phase altogether.
 MODE=${1:-full}
 case "$MODE" in
-  full|quick|correctness)
-    ;;
-  *)
-    echo "Unsupported mode: $MODE" >&2
-    echo "Usage: scripts/run.sh [full|quick|correctness]" >&2
-    exit 2
-    ;;
+	full)
+		WARMUP=200
+		REPEAT=500
+		;;
+	quick)
+		WARMUP=20
+		REPEAT=100
+		;;
+	correctness)
+		WARMUP=0
+		REPEAT=1
+		;;
+	*)
+		echo "Unsupported mode: $MODE" >&2
+		echo "Usage: scripts/run_new.sh [full|quick|correctness]" >&2
+		exit 2
+		;;
 esac
 
+# Allow external harnesses to provide TARGET, while local runs benchmark the
+# solution files shipped with this workspace.
+TARGET=${TARGET:-"$SCRIPT_DIR/../solution"}
 LOG_DIR="$SCRIPT_DIR/output"
-LOG_FILE="$LOG_DIR/bench_latest.log"
+LOG_FILE="$LOG_DIR/bench_new_latest.log"
+V0_FILE="$TARGET/model.py"
+V1_FILE="$TARGET/model_new.py"
 
+if [[ ! -f "$V0_FILE" || ! -f "$V1_FILE" ]]; then
+	echo "Expected model files were not found under TARGET=$TARGET" >&2
+	exit 1
+fi
+
+rm -rf "$LOG_DIR"
 mkdir -p "$LOG_DIR"
+
 cd "$SCRIPT_DIR"
-"$PYTHON_BIN" run.py --mode "$MODE" 2>&1 | tee "$LOG_FILE"
+export PYTHONPATH="$TARGET${PYTHONPATH:+:$PYTHONPATH}"
+"$PYTHON_BIN" bench.py \
+	--v0_file "$V0_FILE" \
+	--v1_file "$V1_FILE" \
+	--warmup "$WARMUP" \
+	--repeat "$REPEAT" \
+	2>&1 | tee "$LOG_FILE"
