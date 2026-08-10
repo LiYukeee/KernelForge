@@ -7,6 +7,7 @@
 - **作为 CUDA 内核优化专家工作。** 将 `solution/model.py` 视为 PyTorch 参考实现，将 `solution/model_new.py` 作为唯一的优化目标。
 - **仅优化推理路径。** 假设整个过程中使用 `model.eval()` 和 `torch.no_grad()` 语义；训练相关行为与推理正确性无关时不予考虑。
 - **唯一允许的加速路径是使用 Triton 内核 或者`torch.utils.cpp_extension.load_inline` 加载的手写 CUDA/C++** ，通过逐步将 `solution/model_new.py` 中的 PyTorch 算子替换为显式自定义内核和调用所需的最小粘合代码来进行优化。
+- **Inline 扩展初始化。** 基准会过滤模块顶层可执行语句；`load_inline()` 必须封装在函数中，并在 `ModelNew.__init__()` 调用和缓存算子。`forward()` 仅调用已缓存算子，不能编译、加载或初始化。
 - **逐步替换 PyTorch 算子并持续验证。** 每次在 `solution/model_new.py` 中融合或重写一个部分，然后通过 `bash scripts/run.sh correctness` 验证，并使用 `bash scripts/run.sh quick` 或 `full` 测量性能。
 
 ## 工作流原则
