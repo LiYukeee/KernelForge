@@ -12,6 +12,13 @@ fi
 # shellcheck source=/dev/null
 source "$ENV_FILE"
 
+# Resolve relative TARGET paths against the scripts directory so the
+# workflow works from any working directory (e.g. the workspace root).
+case "$TARGET" in
+	/*) ;;
+	*) TARGET="$SCRIPT_DIR/$TARGET" ;;
+esac
+
 # Keep the interface consistent with run.sh. new_bench.py always measures
 # latency, so correctness mode uses one untimed-style sample after accuracy
 # validation rather than skipping its required timing phase altogether.
@@ -38,8 +45,7 @@ esac
 
 # Allow external harnesses to provide TARGET, while local runs benchmark the
 # solution files shipped with this workspace.
-TARGET=${TARGET:-"$SCRIPT_DIR/../solution"}
-LOG_DIR="$SCRIPT_DIR/output"
+LOG_DIR="$TARGET/bench_output"
 LOG_FILE="$LOG_DIR/bench_latest.log"
 PROFILE_FILE="$LOG_DIR/profile_latest.txt"
 V0_FILE="$TARGET/model.py"

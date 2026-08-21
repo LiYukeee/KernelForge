@@ -1,4 +1,3 @@
 __pycache__/
-scripts/output/
-experiments/
-temp/
+bench_output/
+exp/

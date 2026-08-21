@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# define optimize target
+export TARGET="../solution/sample_relu"
+
 if command -v nvidia-smi >/dev/null 2>&1; then
   export TORCH_CUDA_ARCH_LIST="12.0"
   export CUDA_HOME=/usr/local/cuda-13.2
@@ -14,6 +17,3 @@ else
   echo "Neither nvidia-smi nor mx-smi was found in PATH." >&2
   return 1 2>/dev/null || exit 1
 fi
-
-# 默认不比较 torch.compile 版本；如需开启，改为 1
-export COMPARE_TORCH_COMPILE=0

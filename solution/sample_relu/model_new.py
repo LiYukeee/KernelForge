@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
-class Model(nn.Module):
+class ModelNew(nn.Module):
     """
     Simple model that performs a ReLU activation.
     """
     def __init__(self):
-        super(Model, self).__init__()
+        super(ModelNew, self).__init__()
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -21,7 +21,7 @@ class Model(nn.Module):
         return torch.relu(x)
 
 batch_size = 4096
-dim = 393216
+dim = 16384
 
 def get_inputs():
     x = torch.rand(batch_size, dim)
