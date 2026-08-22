@@ -71,3 +71,11 @@ class BaseAgent:
         if not messages:
             raise RuntimeError(f"{self.name} 未返回任何消息。")
         return messages[-1].text
+
+    def _finalize_result(self, result: dict[str, Any]) -> None:
+        """处理阶段产物；不需要持久化结果的 Agent 可使用默认空实现。"""
+        return None
+
+    def _validate_result(self, result: dict[str, Any]) -> None:
+        """校验阶段结果；没有额外约束的 Agent 可使用默认空实现。"""
+        return None

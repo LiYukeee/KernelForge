@@ -9,7 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-# TARGET 的相对路径语义需要与 scripts/run.sh 保持一致，因此以 scripts 为基准目录。
+# TARGET 的相对路径语义需要与 scripts/bench.sh 保持一致，因此以 scripts 为基准目录。
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 _ROUND_DIR_PATTERN = re.compile(r"round_(\d+)$")
@@ -19,7 +19,7 @@ def resolve_target_path(target: str | Path | None = None) -> Path:
     """解析并校验算子目录。
 
     优先使用调用者传入的 ``target``；未传入时读取 ``.env`` 中的
-    ``TARGET``。相对路径按照 ``scripts/run.sh`` 的约定，以项目的
+    ``TARGET``。相对路径按照 ``scripts/bench.sh`` 的约定，以项目的
     ``scripts`` 目录为基准进行解析。
     """
     load_dotenv(PROJECT_ROOT / ".env")
