@@ -74,7 +74,23 @@ def _resolve_plan_path(target_path: Path, plan_path: str | Path | None) -> Path:
     resolved = resolved.resolve()
     if not resolved.is_file():
         raise FileNotFoundError(f"计划文件不存在：{resolved}")
+    _plan_round_number(resolved, target_path)
     return resolved
+
+
+def _plan_round_number(plan_path: Path, target_path: Path) -> int:
+    """校验计划位于 TARGET/exp/round_N/plan.md 并返回轮次。"""
+    try:
+        relative = plan_path.resolve().relative_to(target_path.resolve())
+    except ValueError as exc:
+        raise ValueError(f"计划文件必须位于 TARGET/exp/round_N：{plan_path}") from exc
+
+    if len(relative.parts) != 3 or relative.parts[0] != "exp" or relative.name != "plan.md":
+        raise ValueError(f"计划文件必须位于 TARGET/exp/round_N/plan.md：{plan_path}")
+    match = _ROUND_DIR_PATTERN.fullmatch(relative.parts[1])
+    if match is None:
+        raise ValueError(f"计划目录名称必须使用 round_N 格式：{plan_path.parent}")
+    return int(match.group(1))
 
 
 def _relative_to_target(path: Path, target_path: Path) -> str:

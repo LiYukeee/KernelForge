@@ -16,18 +16,11 @@ def _read_prompt_template() -> str:
 
 def build_system_prompt(
     *,
-    target_path: Path,
-    plan_relative: str,
-    bench_mode: str,
-    bench_timeout_seconds: int,
+    plan_relative: str
 ) -> str:
     """将运行时路径和 benchmark 参数注入 Markdown 系统提示词。"""
     replacements = {
-        "{{PLAN_VIRTUAL}}": "/" + plan_relative.lstrip("/"),
-        "{{BENCH_MODE}}": repr(bench_mode),
-        "{{BENCH_TIMEOUT_SECONDS}}": str(bench_timeout_seconds),
-        "{{V0_FILE}}": repr(str(target_path / "model.py")),
-        "{{V1_FILE}}": repr(str(target_path / "model_new.py")),
+        "{{PLAN_VIRTUAL}}": "/" + plan_relative.lstrip("/")
     }
     prompt = _read_prompt_template()
     for marker, value in replacements.items():

@@ -8,6 +8,7 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 from src.base.agent import BaseAgent, print_all_enabled
+from src.base.tools.target_filesystem import build_target_filesystem
 from src.plan.system_prompt import build_system_prompt
 from src.plan.tools import build_plan_tools
 from src.plan.utils import resolve_target_path, select_round_number
@@ -32,12 +33,19 @@ class PlanAgent(BaseAgent):
         self.round_dir = self.target_path / "exp" / f"round_{self.round_number}"
         self.plan_path = self.round_dir / "plan.md"
         self.round_dir.mkdir(parents=True, exist_ok=True)
+        filesystem_access = build_target_filesystem(
+            self.target_path,
+            role="plan",
+            round_number=self.round_number,
+        )
+        self.filesystem_backend = filesystem_access.backend
 
         super().__init__(
             name="plan_agent",
             default_task=DEFAULT_TASK,
             system_prompt=build_system_prompt(round_number=self.round_number),
             tools=build_plan_tools(self.target_path),
+            middleware=[filesystem_access.middleware],
             model=model,
         )
 

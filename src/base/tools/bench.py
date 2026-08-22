@@ -9,7 +9,7 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from langchain_core.tools import tool
+from langchain_core.tools import BaseTool, tool
 
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -87,6 +87,7 @@ def run_bench(
     timeout_seconds: int = 600,
     v0_file: str | None = None,
     v1_file: str | None = None,
+    target_dir: str | None = None,
 ) -> str:
     """Run ``scripts/bench.sh`` and return an agent-readable diagnostic."""
     if mode not in _VALID_MODES:
@@ -104,6 +105,10 @@ def run_bench(
         command.extend(("--v0-file", v0_file))
     if v1_file is not None:
         command.extend(("--v1-file", v1_file))
+    process_env = None
+    if target_dir is not None:
+        process_env = os.environ.copy()
+        process_env["BENCH_TARGET_OVERRIDE"] = str(Path(target_dir).resolve())
 
     started = time.monotonic()
     try:
@@ -114,6 +119,7 @@ def run_bench(
             stderr=subprocess.STDOUT,
             text=True,
             start_new_session=True,
+            env=process_env,
         )
     except OSError as exc:
         return _format_result(
@@ -157,8 +163,6 @@ def run_bench(
 def bench(
     mode: Literal["full", "quick", "correctness"] = "full",
     timeout_seconds: int = 600,
-    v0_file: str | None = None,
-    v1_file: str | None = None,
 ) -> str:
     """运行 scripts/bench.sh，验证 model_new.py 的正确性并测量相对 model.py 的性能。
 
@@ -184,11 +188,33 @@ def bench(
     应使用顶层字符串/数值字面量。不要依赖被过滤内容来导入 Triton、定义 kernel、
     设置可用性标志或选择实现路径。
 
-    失败时工具原样返回脚本诊断、退出码和耗时，不在工具层猜测错误类型。可选
-    ``v0_file``/``v1_file`` 会原样传给脚本，必须使用宿主机绝对路径，不使用文件
-    工具的 TARGET 虚拟路径。
+    失败时工具原样返回脚本诊断、退出码和耗时，不在工具层猜测错误类型。V0/V1
+    路径由控制器绑定，模型不能传入或覆盖宿主机文件路径。
     """
-    return run_bench(mode, timeout_seconds, v0_file, v1_file)
+    return run_bench(mode, timeout_seconds)
+
+
+def build_bench_tool(target_path: Path) -> BaseTool:
+    """创建固定使用 TARGET/model.py 和 TARGET/model_new.py 的 benchmark 工具。"""
+    resolved_target = target_path.resolve()
+    v0_file = str(resolved_target / "model.py")
+    v1_file = str(resolved_target / "model_new.py")
+
+    @tool("bench", description=bench.description)
+    def target_bench(
+        mode: Literal["full", "quick", "correctness"] = "full",
+        timeout_seconds: int = 600,
+    ) -> str:
+        return run_bench(
+            mode,
+            timeout_seconds,
+            v0_file=v0_file,
+            v1_file=v1_file,
+            target_dir=str(resolved_target),
+        )
+
+    return target_bench
+
 
 if __name__ == "__main__":
     print(run_bench())

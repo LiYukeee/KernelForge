@@ -15,6 +15,12 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# Agent-created benchmark tools bind this override server-side so explicit
+# TARGET arguments control both model inputs and the benchmark log directory.
+if [[ -n "${BENCH_TARGET_OVERRIDE:-}" ]]; then
+	TARGET="$BENCH_TARGET_OVERRIDE"
+fi
+
 # Resolve relative TARGET paths against the scripts directory so the
 # workflow works from any working directory (e.g. the workspace root).
 case "$TARGET" in

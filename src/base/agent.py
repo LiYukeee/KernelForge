@@ -29,18 +29,21 @@ class BaseAgent:
         default_task: str,
         system_prompt: str,
         tools: Sequence[Any],
+        middleware: Sequence[Any] = (),
         model: Any | None = None,
     ) -> None:
         self.name = name
         self.default_task = default_task
         self.system_prompt = system_prompt
         self.tools = list(tools)
+        self.middleware = list(middleware)
         self.model = (
             model if model is not None else load_model(streaming=print_all_enabled())
         )
         self.agent = create_agent(
             model=self.model,
             tools=self.tools,
+            middleware=self.middleware,
             system_prompt=self.system_prompt,
             name=self.name,
         )

@@ -6,19 +6,19 @@ from pathlib import Path
 from typing import Any
 
 from deepagents import create_deep_agent
-from deepagents.backends import FilesystemBackend
 from langchain.agents.middleware import TodoListMiddleware
 
 from src.base.agent import print_all_enabled
 from src.base.model import load_model
 from src.base.streaming import AgentOutputCallback
+from src.base.tools.target_filesystem import build_target_filesystem
 from src.code.system_prompt import DEFAULT_TASK, build_system_prompt
-from src.code.tools.bench import bench
-from src.code.tools.filesystem import build_code_filesystem_middleware
+from src.base.tools.bench import build_bench_tool
 from src.code.utils import (
     _benchmark_passed,
     _last_bench_result,
     _message_text,
+    _plan_round_number,
     _relative_to_target,
     _resolve_plan_path,
 )
@@ -42,36 +42,32 @@ class CodeAgent:
         plan_path: str | Path | None = None,
         model: Any | None = None,
         max_repair_attempts: int = MAX_REPAIR_ATTEMPTS,
-        bench_mode: str = "full",
-        bench_timeout_seconds: int = 600,
     ) -> None:
         if max_repair_attempts < 0:
             raise ValueError("max_repair_attempts 不能小于 0。")
-        if bench_mode not in {"full", "quick", "correctness"}:
-            raise ValueError(f"不支持的 benchmark 模式：{bench_mode!r}")
-        if bench_timeout_seconds <= 0:
-            raise ValueError("bench_timeout_seconds 必须大于 0。")
 
         self.target_path = resolve_target_path(target)
         self.plan_path = _resolve_plan_path(self.target_path, plan_path)
+        self.round_number = _plan_round_number(self.plan_path, self.target_path)
         self.max_repair_attempts = min(max_repair_attempts, MAX_REPAIR_ATTEMPTS)
-        self.bench_mode = bench_mode
-        self.bench_timeout_seconds = bench_timeout_seconds
         self.model = model if model is not None else load_model(streaming=print_all_enabled())
-        filesystem_backend = FilesystemBackend(root_dir=self.target_path)
+        filesystem_access = build_target_filesystem(
+            self.target_path,
+            role="code",
+            round_number=self.round_number,
+        )
+        self.filesystem_backend = filesystem_access.backend
+        self.bench_tool = build_bench_tool(self.target_path)
         self.agent = create_deep_agent(
             model=self.model,
-            tools=[bench],
+            tools=[self.bench_tool],
             middleware=[
-                build_code_filesystem_middleware(filesystem_backend),
+                filesystem_access.middleware,
                 TodoListMiddleware(),
             ],
-            backend=filesystem_backend,
+            backend=self.filesystem_backend,
             system_prompt=build_system_prompt(
-                target_path=self.target_path,
-                plan_relative=_relative_to_target(self.plan_path, self.target_path),
-                bench_mode=self.bench_mode,
-                bench_timeout_seconds=self.bench_timeout_seconds,
+                plan_relative=_relative_to_target(self.plan_path, self.target_path)
             ),
             name="code_agent",
         )
@@ -92,12 +88,10 @@ class CodeAgent:
 
     def _run_bench_fallback(self) -> str:
         """Run benchmark if the model ended a turn without calling its tool."""
-        return bench.invoke(
+        return self.bench_tool.invoke(
             {
                 "mode": self.bench_mode,
                 "timeout_seconds": self.bench_timeout_seconds,
-                "v0_file": str(self.target_path / "model.py"),
-                "v1_file": str(self.target_path / "model_new.py"),
             }
         )
 
@@ -118,9 +112,10 @@ class CodeAgent:
             and repair_attempts < self.max_repair_attempts
         ):
             repair_attempts += 1
-            repair_task = f"""上一轮修改后的 benchmark 没有通过。请读取当前工作区和计划，针对下面的原始 benchmark 输出修复当前自定义实现；必要时在 Triton 与 CUDA 路线之间通过源码修改切换，然后再次调用 bench 一次。
+            repair_task = f"""
+上一轮修改后的 benchmark 没有通过。请读取当前工作区和计划，针对下面的原始 benchmark 输出修复当前自定义实现；必要时在 Triton 与 CUDA 路线之间通过源码修改切换，然后再次调用 bench 一次。
 
-这是第 {repair_attempts}/{self.max_repair_attempts} 次修复。不要修改 `model.py` 或 `.env`，不要只给出建议，必须写入代码并验证。不得加入 PyTorch/ATen 运行时退化路径，不得用可用性标志、守卫或宽泛异常处理隐藏自定义 kernel 的错误。
+这是第 {repair_attempts}/{self.max_repair_attempts} 次修复。写入代码并验证。不得加入 PyTorch/ATen 运行时退化路径。
 
 原始 benchmark 输出：
 {benchmark_result}
