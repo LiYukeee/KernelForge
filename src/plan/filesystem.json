@@ -1,0 +1,15 @@
+{
+  "read": [
+    "/",
+    "/model.py",
+    "/model_new.py",
+    "/exp",
+    "/exp/**",
+    "/bench_output",
+    "/bench_output/**"
+  ],
+  "write": [
+    "/exp/round_{round_number}",
+    "/exp/round_{round_number}/**"
+  ]
+}

@@ -32,7 +32,6 @@ class PlanAgent(BaseAgent):
         self.round_number = select_round_number(self.target_path)
         self.round_dir = self.target_path / "exp" / f"round_{self.round_number}"
         self.plan_path = self.round_dir / "plan.md"
-        self.round_dir.mkdir(parents=True, exist_ok=True)
         filesystem_access = build_target_filesystem(
             self.target_path,
             role="plan",
@@ -59,9 +58,10 @@ class PlanAgent(BaseAgent):
         if not plan_text:
             raise RuntimeError("PLAN Agent 未返回可保存的计划正文。")
 
-        temporary_path = self.plan_path.with_name(f".{self.plan_path.name}.tmp")
-        temporary_path.write_text(plan_text.rstrip() + "\n", encoding="utf-8")
-        temporary_path.replace(self.plan_path)
+        self.filesystem_backend.atomic_write_text(
+            f"/exp/round_{self.round_number}/plan.md",
+            plan_text.rstrip() + "\n",
+        )
 
     def _validate_result(self, result: dict[str, Any]) -> None:
         """确认 PLAN 阶段已经生成本轮计划文件。"""

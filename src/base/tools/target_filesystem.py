@@ -1,10 +1,14 @@
-"""PLAN 和 CODE Agent 共用的 TARGET 文件访问策略。"""
+"""PLAN、CODE 和 LOG Agent 共用的 TARGET 文件访问策略。"""
 
 from __future__ import annotations
 
+import json
+import re
+import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Literal, Mapping
+from typing import Mapping
 
 from deepagents.backends import FilesystemBackend
 from deepagents.backends.protocol import (
@@ -18,7 +22,11 @@ from deepagents.backends.protocol import (
 from deepagents.middleware import FilesystemMiddleware, FilesystemPermission
 
 
-AgentRole = Literal["plan", "code"]
+AgentRole = str
+
+_SRC_ROOT = Path(__file__).resolve().parents[2]
+_POLICY_FILE_NAME = "filesystem.json"
+_ROLE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 TARGET_FILESYSTEM_TOOL_NAMES = [
     "ls",
@@ -29,15 +37,95 @@ TARGET_FILESYSTEM_TOOL_NAMES = [
     "grep",
 ]
 
-_READABLE_PATHS = [
-    "/",
-    "/model.py",
-    "/model_new.py",
-    "/exp",
-    "/exp/**",
-    "/bench_output",
-    "/bench_output/**",
-]
+
+@dataclass(frozen=True)
+class TargetFilesystemPolicy:
+    """从 Agent 目录配置加载的虚拟路径白名单。"""
+
+    read_paths: tuple[str, ...]
+    write_paths: tuple[str, ...]
+
+
+def _render_policy_path(path: str, *, round_number: int, config_path: Path) -> str:
+    """渲染并校验一个精确路径或 ``/**`` 子树规则。"""
+    rendered = path.replace("{round_number}", str(round_number))
+    if "{" in rendered or "}" in rendered:
+        raise ValueError(f"文件系统配置包含未知占位符：{config_path}: {path!r}")
+    if not rendered.startswith("/") or "\\" in rendered:
+        raise ValueError(
+            f"文件系统配置路径必须是 POSIX 绝对路径：{config_path}: {path!r}"
+        )
+
+    subtree = rendered.endswith("/**")
+    if rendered == "/**":
+        base_path = "/"
+    elif subtree:
+        base_path = rendered[:-3]
+    else:
+        base_path = rendered
+    if any(character in base_path for character in "*?[]"):
+        raise ValueError(
+            f"文件系统配置只支持精确路径和 /** 规则：{config_path}: {path!r}"
+        )
+
+    normalized = PurePosixPath(base_path)
+    if ".." in normalized.parts or "~" in normalized.parts:
+        raise ValueError(f"文件系统配置路径不能包含 .. 或 ~：{config_path}: {path!r}")
+    normalized_text = normalized.as_posix()
+    if not normalized_text.startswith("/") or normalized_text != base_path:
+        raise ValueError(f"文件系统配置路径必须是规范路径：{config_path}: {path!r}")
+    if subtree:
+        return "/**" if normalized_text == "/" else f"{normalized_text}/**"
+    return normalized_text
+
+
+def load_target_filesystem_policy(
+    *,
+    role: AgentRole,
+    round_number: int,
+) -> TargetFilesystemPolicy:
+    """加载 ``src/<role>/filesystem.json`` 并渲染当前轮次。"""
+    if round_number <= 0:
+        raise ValueError("round_number 必须大于 0。")
+    if not _ROLE_PATTERN.fullmatch(role):
+        raise ValueError(f"Agent 角色名只能包含小写字母、数字和下划线：{role!r}")
+
+    config_path = _SRC_ROOT / role / _POLICY_FILE_NAME
+    if not config_path.is_file():
+        raise FileNotFoundError(f"Agent 缺少文件系统配置：{config_path}")
+    try:
+        raw_config = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Agent 文件系统配置不是合法 JSON：{config_path}: {exc}") from exc
+
+    if not isinstance(raw_config, dict) or set(raw_config) != {"read", "write"}:
+        raise ValueError(f"Agent 文件系统配置必须且只能包含 read、write：{config_path}")
+
+    rendered_paths: dict[str, tuple[str, ...]] = {}
+    for operation in ("read", "write"):
+        paths = raw_config[operation]
+        if not isinstance(paths, list) or any(
+            not isinstance(path, str) for path in paths
+        ):
+            raise ValueError(
+                f"Agent 文件系统配置的 {operation} 必须是字符串数组：{config_path}"
+            )
+        rendered = tuple(
+            _render_policy_path(
+                path,
+                round_number=round_number,
+                config_path=config_path,
+            )
+            for path in paths
+        )
+        if len(rendered) != len(set(rendered)):
+            raise ValueError(f"Agent 文件系统配置的 {operation} 包含重复路径：{config_path}")
+        rendered_paths[operation] = rendered
+
+    return TargetFilesystemPolicy(
+        read_paths=rendered_paths["read"],
+        write_paths=rendered_paths["write"],
+    )
 
 
 class TargetFilesystemBackend(FilesystemBackend):
@@ -49,10 +137,13 @@ class TargetFilesystemBackend(FilesystemBackend):
         *,
         role: AgentRole,
         round_number: int,
+        policy: TargetFilesystemPolicy | None = None,
     ) -> None:
         super().__init__(root_dir=root_dir, virtual_mode=True)
-        self._role = role
-        self._round_path = PurePosixPath(f"/exp/round_{round_number}")
+        self._policy = policy or load_target_filesystem_policy(
+            role=role,
+            round_number=round_number,
+        )
 
     @staticmethod
     def _normalize_virtual_path(path: str) -> PurePosixPath | None:
@@ -65,34 +156,36 @@ class TargetFilesystemBackend(FilesystemBackend):
         return candidate
 
     @staticmethod
-    def _is_at_or_below(path: PurePosixPath, root: PurePosixPath) -> bool:
-        return path == root or root in path.parents
+    def _matches_policy_path(path: PurePosixPath, pattern: str) -> bool:
+        if pattern == "/**":
+            return True
+        if pattern.endswith("/**"):
+            root = PurePosixPath(pattern[:-3])
+            return path == root or root in path.parents
+        return path == PurePosixPath(pattern)
+
+    @classmethod
+    def _matches_any_policy_path(
+        cls,
+        path: PurePosixPath,
+        patterns: tuple[str, ...],
+    ) -> bool:
+        return any(cls._matches_policy_path(path, pattern) for pattern in patterns)
 
     def _can_read_virtual(self, path: str) -> bool:
         candidate = self._normalize_virtual_path(path)
         if candidate is None:
             return False
-        if candidate in {
-            PurePosixPath("/"),
-            PurePosixPath("/model.py"),
-            PurePosixPath("/model_new.py"),
-        }:
-            return True
-        return self._is_at_or_below(
+        return self._matches_any_policy_path(
             candidate,
-            PurePosixPath("/exp"),
-        ) or self._is_at_or_below(
-            candidate,
-            PurePosixPath("/bench_output"),
+            self._policy.read_paths,
         )
 
     def _can_write_virtual(self, path: str) -> bool:
         candidate = self._normalize_virtual_path(path)
         if candidate is None:
             return False
-        if self._role == "code" and candidate == PurePosixPath("/model_new.py"):
-            return True
-        return self._is_at_or_below(candidate, self._round_path)
+        return self._matches_any_policy_path(candidate, self._policy.write_paths)
 
     def _resolved_virtual_path(self, path: str) -> str | None:
         try:
@@ -143,6 +236,51 @@ class TargetFilesystemBackend(FilesystemBackend):
             new_string,
             replace_all=replace_all,
         )
+
+    def atomic_write_text(self, file_path: str, content: str) -> None:
+        """按当前策略原子写入控制器生成的 UTF-8 文本。"""
+        if not self._can_write(file_path):
+            raise PermissionError(f"permission denied for write on {file_path}")
+        destination = self._resolve_path(file_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        )
+        temporary_path = Path(temporary_file.name)
+        try:
+            with temporary_file:
+                temporary_file.write(content)
+            temporary_path.replace(destination)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+
+    def atomic_copy(self, source_path: str, destination_path: str) -> None:
+        """按当前读写策略原子复制控制器管理的文件。"""
+        if not self._can_read(source_path):
+            raise PermissionError(f"permission denied for read on {source_path}")
+        if not self._can_write(destination_path):
+            raise PermissionError(f"permission denied for write on {destination_path}")
+        source = self._resolve_path(source_path)
+        destination = self._resolve_path(destination_path)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary_file = tempfile.NamedTemporaryFile(
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            suffix=".tmp",
+            delete=False,
+        )
+        temporary_path = Path(temporary_file.name)
+        temporary_file.close()
+        try:
+            shutil.copy2(source, temporary_path)
+            temporary_path.replace(destination)
+        finally:
+            temporary_path.unlink(missing_ok=True)
 
     def ls(self, path: str) -> LsResult:
         if not self._can_read(path):
@@ -205,21 +343,23 @@ def build_target_permissions(
     role: AgentRole,
     round_number: int,
 ) -> list[FilesystemPermission]:
-    """构造角色权限；规则按 first-match-wins 顺序排列。"""
-    if role not in {"plan", "code"}:
-        raise ValueError(f"不支持的 Agent 角色：{role!r}")
-    if round_number <= 0:
-        raise ValueError("round_number 必须大于 0。")
+    """从 Agent 配置构造权限；规则按 first-match-wins 顺序排列。"""
+    policy = load_target_filesystem_policy(
+        role=role,
+        round_number=round_number,
+    )
+    return _build_permissions_from_policy(policy)
 
-    round_path = f"/exp/round_{round_number}"
-    writable_paths = [round_path, f"{round_path}/**"]
-    if role == "code":
-        writable_paths.insert(0, "/model_new.py")
+
+def _build_permissions_from_policy(
+    policy: TargetFilesystemPolicy,
+) -> list[FilesystemPermission]:
+    """把已校验策略转换为 FilesystemMiddleware 权限。"""
 
     return [
         FilesystemPermission(
             operations=["read"],
-            paths=list(_READABLE_PATHS),
+            paths=list(policy.read_paths),
             mode="allow",
         ),
         FilesystemPermission(
@@ -229,7 +369,7 @@ def build_target_permissions(
         ),
         FilesystemPermission(
             operations=["write"],
-            paths=writable_paths,
+            paths=list(policy.write_paths),
             mode="allow",
         ),
         FilesystemPermission(
@@ -248,14 +388,16 @@ def build_target_filesystem(
     custom_tool_descriptions: Mapping[str, str] | None = None,
 ) -> TargetFilesystemAccess:
     """创建以 TARGET 为虚拟根目录的受限文件工具中间件。"""
-    permissions = build_target_permissions(
+    policy = load_target_filesystem_policy(
         role=role,
         round_number=round_number,
     )
+    permissions = _build_permissions_from_policy(policy)
     backend = TargetFilesystemBackend(
         target_path,
         role=role,
         round_number=round_number,
+        policy=policy,
     )
     middleware = FilesystemMiddleware(
         backend=backend,
