@@ -32,8 +32,10 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description=(
             "Compare KS competition v0/v1 Python files. The v0 file must define "
-            "Model/get_init_inputs/get_inputs, and the v1 file must define "
-            "ModelNew/get_init_inputs/get_inputs. All tensors and models must be on the same device! "
+            "Model/get_init_inputs/get_inputs, and the v1 file must define the "
+            "same Model/get_init_inputs/get_inputs interface. V0 and V1 are "
+            "distinguished by their file paths, not by class names. All tensors "
+            "and models must be on the same device! "
             "For example: python benchmarks/ks/auto_bench.py --v0_file dlblas/kernels/ks_competition/torch/layer_norm.py "
             "--v1_file dlblas/kernels/ks_competition/triton/layer_norm.py "
         )
@@ -362,7 +364,7 @@ def build_case(v0_path: Path, v1_path: Path, seed: int):
     v1_module = load_ks_module(v1_path)
 
     model_cls = require_attr(v0_module, "Model", v0_path)
-    model_new_cls = require_attr(v1_module, "ModelNew", v1_path)
+    model_new_cls = require_attr(v1_module, "Model", v1_path)
     v0_get_init_inputs = require_attr(v0_module, "get_init_inputs", v0_path)
     v1_get_init_inputs = require_attr(v1_module, "get_init_inputs", v1_path)
     v0_get_inputs = require_attr(v0_module, "get_inputs", v0_path)
@@ -392,7 +394,7 @@ def build_case(v0_path: Path, v1_path: Path, seed: int):
         lambda: model_cls(*v0_init_args), f"{v0_path}: Model(...)"
     )
     model_new = call_with_context(
-        lambda: model_new_cls(*v1_init_args), f"{v1_path}: ModelNew(...)"
+        lambda: model_new_cls(*v1_init_args), f"{v1_path}: Model(...)"
     )
     if hasattr(model, "eval"):
         model.eval()
@@ -449,6 +451,8 @@ def time_forward(model, inputs, seed, warmup, repeat):
 
 def _get_model_device(model):
     """Return the device of *model*'s first parameter or buffer, or None."""
+    if model is None:
+        return None
     try:
         return next(model.parameters()).device
     except StopIteration:

@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
-class ModelNew(nn.Module):
+class Model(nn.Module):
     """
     Simple model that performs a ReLU activation.
     """
     def __init__(self):
-        super(ModelNew, self).__init__()
+        super(Model, self).__init__()
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
