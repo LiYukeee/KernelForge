@@ -9,7 +9,8 @@ if [[ ! -f "$ENV_FILE" ]]; then
 	exit 1
 fi
 
-# .env uses plain KEY=value lines (no `export`), so auto-export while sourcing.
+# .env mixes plain KEY=value and `export KEY=value` lines; sourcing under
+# `set -a` auto-exports the plain ones and honors the `export`ed ones alike.
 set -a
 # shellcheck source=/dev/null
 source "$ENV_FILE"
