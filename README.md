@@ -1,15 +1,8 @@
 <div align="center" id="top">
 
-<h1 align="center">
-  <img src="assets/project_ico_black.png" alt="KernelForge logo" width="120" align="middle">
-  KernelForge
-</h1>
+![image](assets\overview.jpg)
 
-<h2><a href="https://liyuke.cn/KernelForge_Page/">Project Page</a> | <a href="doc/index.md">文档</a></h2>
-
-</div>
-
-基于 Claude Code 的自主 CUDA 算子优化系统。通过 `/optimize` 命令驱动迭代优化循环，将 PyTorch 参考实现逐步替换为高性能自定义内核。
+基于 Claude Code 的自主 GPU 算子优化系统。通过 `/optimize` 命令驱动迭代优化循环，将 PyTorch 参考实现逐步替换为高性能自定义内核。
 
 ## 项目结构
 
