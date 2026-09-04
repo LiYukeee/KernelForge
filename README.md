@@ -9,7 +9,7 @@
   KernelForge
 </h1>
 
-<h2><a href="https://liyuke.cn/KernelForge_Page/">Project Page</a> | <a href="doc/index.md">文档</a></h2>
+<h2><a href="https://liyuke.cn/KernelForge_Page/">Project Page</a> | <a href="doc/index.md">文档</a> | <a href="https://liyuke.cn/KernelForge_Page/static/pdfs/slide.pdf">演示</a> | <a href="https://liyuke.cn/KernelForge_Page/static/pdfs/report.pdf">技术报告</a></h2>
 
 </div>
 
