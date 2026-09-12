@@ -15,4 +15,5 @@ def load_model(*, streaming: bool = False):
         base_url=os.getenv("BASE_URL"),
         api_key=os.getenv("API_KEY"),
         streaming=streaming,
+        stream_usage=streaming,
     )

@@ -88,12 +88,7 @@ class CodeAgent:
 
     def _run_bench_fallback(self) -> str:
         """Run benchmark if the model ended a turn without calling its tool."""
-        return self.bench_tool.invoke(
-            {
-                "mode": self.bench_mode,
-                "timeout_seconds": self.bench_timeout_seconds,
-            }
-        )
+        return self.bench_tool.invoke({})
 
     def run(self, instruction: str | None = None, **kwargs: Any) -> str:
         """执行计划，并最多进行五次由 benchmark 诊断驱动的修复。"""
