@@ -3,3 +3,5 @@ bench_output/
 exp/
 .env
 tests/
+.codegraph
+solution/
