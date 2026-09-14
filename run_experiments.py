@@ -61,7 +61,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--rounds",
-        required=True,
+        required=False,
+        default=10,
         type=_positive_int,
         metavar="N",
         help="Final absolute optimization round to complete.",
