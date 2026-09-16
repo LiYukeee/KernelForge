@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import sys
+import time
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -25,6 +27,18 @@ from src.plan.utils import resolve_target_path
 _ROUND_DIR_PATTERN = re.compile(r"round_(\d+)$")
 _TOKEN_USAGE_FILENAME = "token_usage.jsonl"
 _ResultT = TypeVar("_ResultT")
+_RETRYABLE_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+_RETRYABLE_ERROR_MARKERS = (
+    "connecterror",
+    "connection error",
+    "connectionerror",
+    "internalservererror",
+    "rate limit",
+    "ratelimiterror",
+    "timed out",
+    "timeout",
+    "too many requests",
+)
 
 
 @dataclass(frozen=True)
@@ -48,6 +62,88 @@ def _positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return parsed
+
+
+def _nonnegative_float_env(name: str, default: float) -> float:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    value = float(raw_value)
+    if value < 0:
+        raise ValueError(f"{name} must be non-negative.")
+    return value
+
+
+def _positive_int_env(name: str, default: int) -> int:
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return default
+    value = int(raw_value)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
+def _exception_chain(exc: BaseException):
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        yield current
+        current = current.__cause__ or current.__context__
+
+
+def _is_retryable_api_error(exc: BaseException) -> bool:
+    for current in _exception_chain(exc):
+        if isinstance(current, (ConnectionError, TimeoutError)):
+            return True
+
+        status_code = getattr(current, "status_code", None)
+        response = getattr(current, "response", None)
+        if status_code is None and response is not None:
+            status_code = getattr(response, "status_code", None)
+        if status_code in _RETRYABLE_STATUS_CODES:
+            return True
+        if isinstance(status_code, int) and status_code >= 500:
+            return True
+
+        error_text = f"{type(current).__name__}: {current}".lower()
+        if any(marker in error_text for marker in _RETRYABLE_ERROR_MARKERS):
+            return True
+    return False
+
+
+def _run_plan_with_retry(operation: Callable[[], _ResultT]) -> _ResultT:
+    attempts = _positive_int_env("PLAN_MAX_ATTEMPTS", 3)
+    base_delay = _nonnegative_float_env("PLAN_RETRY_BASE_DELAY_SECONDS", 5.0)
+    max_delay = _nonnegative_float_env("PLAN_RETRY_MAX_DELAY_SECONDS", 60.0)
+    if max_delay < base_delay:
+        raise ValueError(
+            "PLAN_RETRY_MAX_DELAY_SECONDS must be greater than or equal to "
+            "PLAN_RETRY_BASE_DELAY_SECONDS."
+        )
+
+    for attempt in range(1, attempts + 1):
+        try:
+            return operation()
+        except Exception as exc:
+            if attempt == attempts or not _is_retryable_api_error(exc):
+                raise
+
+            delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
+            if delay > 0:
+                delay = min(
+                    max_delay,
+                    delay + random.uniform(0, min(2.0, delay * 0.1)),
+                )
+            print(
+                f"PLAN transient API error; retrying in {delay:.1f}s "
+                f"(attempt {attempt + 1}/{attempts})",
+                flush=True,
+            )
+            time.sleep(delay)
+
+    raise AssertionError("PLAN retry loop exited unexpectedly.")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -412,7 +508,9 @@ def _run_round(target_path: Path, round_number: int) -> RoundResult:
             target_path,
             round_number,
             "PLAN",
-            lambda config: plan_agent.run(config=config),
+            lambda config: _run_plan_with_retry(
+                lambda: plan_agent.run(config=config)
+            ),
         )
         plan_path = plan_agent.plan_path
         if not _nonempty_file(plan_path):

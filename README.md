@@ -44,6 +44,15 @@ BASE_URL="https://your-api-endpoint/v1"
 API_KEY="your-api-key"
 MODEL_PROVIDER="deepseek"
 
+# 模型单次请求重试与超时
+MODEL_MAX_RETRIES="2"
+MODEL_TIMEOUT_SECONDS="180"
+
+# PLAN 阶段瞬时 API 故障的整体重试与指数退避
+PLAN_MAX_ATTEMPTS="3"
+PLAN_RETRY_BASE_DELAY_SECONDS="5"
+PLAN_RETRY_MAX_DELAY_SECONDS="60"
+
 # Benchmark 使用的 Python 和 CUDA 环境
 PYTHON_BIN="/path/to/benchmark-env/bin/python"
 TORCH_CUDA_ARCH_LIST="12.0"
@@ -62,6 +71,12 @@ PRINT_ALL="true"
 ```
 
 `MODEL_NAME`、`BASE_URL` 和 `API_KEY` 必须与 `MODEL_PROVIDER` 对应的 LangChain 模型后端匹配。若不使用 LangSmith，可将 `LANGSMITH_TRACING` 设为 `false` 并留空相关字段。
+
+模型客户端默认在单次请求失败后最多重试 2 次，单次请求超时为 180 秒。PLAN
+阶段遇到连接失败、超时、限流或 HTTP 5xx 时，默认最多执行 3 次，并采用带少量
+随机抖动的指数退避；认证、参数错误等其他 HTTP 4xx 不会重试。整体重试仅用于
+以读取和分析为主的 PLAN 阶段，避免 CODE 阶段已经修改文件后被重复执行。以上行为
+可通过对应环境变量调整；将 `PLAN_MAX_ATTEMPTS` 设为 `1` 可以关闭阶段级重试。
 
 ## 算子目录格式
 
@@ -219,4 +234,3 @@ bash scripts/get_system_info.sh
 ```
 
 Benchmark 会比较两份实现的递归输出，浮点张量默认使用 `atol=1e-2`、`rtol=1e-2`，正确性通过后报告两者延迟中位数和 `speedup = baseline / candidate`。
-
