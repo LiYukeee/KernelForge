@@ -164,7 +164,7 @@ def bench(
     mode: Literal["full", "quick", "correctness"] = "full",
     timeout_seconds: int = 600,
 ) -> str:
-    """运行 scripts/bench.sh，验证 model_new.py 的正确性并测量相对 model.py 的性能。
+    """验证 model_new.py 的正确性并测量相对 model.py 的性能。
 
     验证流程：脚本固定随机种子加载 V0/V1 的 ``Model``、``get_init_inputs`` 和
     ``get_inputs``，自动选择加速设备，并让 V1 使用 V0 输入的克隆。随后分别执行

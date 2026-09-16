@@ -14,6 +14,7 @@ from src.base.streaming import AgentOutputCallback
 from src.base.tools.target_filesystem import build_target_filesystem
 from src.code.system_prompt import DEFAULT_TASK, build_system_prompt
 from src.base.tools.bench import build_bench_tool
+from src.base.tools.profile import build_profile_tool
 from src.code.utils import (
     _benchmark_passed,
     _last_bench_result,
@@ -25,7 +26,7 @@ from src.code.utils import (
 from src.plan.utils import resolve_target_path
 
 
-MAX_REPAIR_ATTEMPTS = 5
+MAX_REPAIR_ATTEMPTS = 10
 
 
 class CodeAgent:
@@ -58,9 +59,10 @@ class CodeAgent:
         )
         self.filesystem_backend = filesystem_access.backend
         self.bench_tool = build_bench_tool(self.target_path)
+        self.profile_tool = build_profile_tool(self.target_path)
         self.agent = create_deep_agent(
             model=self.model,
-            tools=[self.bench_tool],
+            tools=[self.bench_tool, self.profile_tool],
             middleware=[
                 filesystem_access.middleware,
                 TodoListMiddleware(),
@@ -136,7 +138,12 @@ class CodeAgent:
         ]
         if final_report.strip():
             report_parts.extend(("Agent report:", final_report.strip()))
-        return "\n".join(report_parts)
+        result = "\n".join(report_parts)
+        self.filesystem_backend.atomic_write_text(
+            f"/exp/round_{self.round_number}/code.md",
+            result.rstrip() + "\n",
+        )
+        return result
 
 
 def main() -> None:

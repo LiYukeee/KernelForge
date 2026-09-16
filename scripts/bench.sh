@@ -1,3 +1,18 @@
+# # 默认 full 模式，跑默认 model.py 和 model_new.py
+# ./scripts/bench.sh
+# # 快速模式
+# ./scripts/bench.sh quick
+# # 只验证正确性
+# ./scripts/bench.sh correctness
+# # 指定两个模型文件，默认 full 模式
+# ./scripts/bench.sh path/to/v0.py path/to/v1.py
+# # 快速模式 + 指定两个模型文件
+# ./scripts/bench.sh quick path/to/v0.py path/to/v1.py
+# # 用命名参数指定文件
+# ./scripts/bench.sh quick --v0-file path/to/v0.py --v1-file path/to/v1.py
+# # 查看帮助
+# ./scripts/bench.sh --help
+
 #!/usr/bin/env bash
 set -euo pipefail
 

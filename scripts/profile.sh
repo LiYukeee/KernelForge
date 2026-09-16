@@ -15,6 +15,12 @@ set -a
 source "$ENV_FILE"
 set +a
 
+# Agent-created profiling tools bind this override server-side so the output
+# file and the model path belong to the target selected by the controller.
+if [[ -n "${PROFILE_TARGET_OVERRIDE:-}" ]]; then
+	TARGET="$PROFILE_TARGET_OVERRIDE"
+fi
+
 # Resolve relative TARGET paths against the scripts directory so the workflow
 # works from any working directory (e.g. the workspace root).
 case "$TARGET" in

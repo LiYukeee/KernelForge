@@ -200,7 +200,7 @@ def _run_stage(
 
 
 def _token_usage_path(target_path: Path) -> Path:
-    return target_path / "exp" / _TOKEN_USAGE_FILENAME
+    return target_path / "log" / _TOKEN_USAGE_FILENAME
 
 
 def _usage_from_record(record: dict[str, object]) -> TokenUsage:

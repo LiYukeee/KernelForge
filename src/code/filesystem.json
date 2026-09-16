@@ -3,8 +3,8 @@
     "/",
     "/model.py",
     "/model_new.py",
-    "/exp",
-    "/exp/**",
+    "/exp/round_{round_number}",
+    "/exp/round_{round_number}/**",
     "/bench_output",
     "/bench_output/**"
   ],
