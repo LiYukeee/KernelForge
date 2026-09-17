@@ -6,7 +6,7 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 RUNNER="$PROJECT_ROOT/run_experiments.py"
 
 # Edit these values directly before running the script.
-experiment_root="$PROJECT_ROOT/solution/L1"
+experiment_root="$PROJECT_ROOT/solution/L3"
 rounds=10
 n_jobs=1
 delay_time=20
@@ -28,7 +28,7 @@ while IFS= read -r -d '' experiment_dir; do
 		"$python_command" "$RUNNER" "$experiment_dir" "$rounds" "$log_file"
 	command_list+=("$command")
 	experiment_list+=("$experiment_dir")
-done < <(find "$experiment_root" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+done < <(find "$experiment_root" -mindepth 1 -maxdepth 1 -type d -print0 | sort -V -z)
 
 if ((${#command_list[@]} == 0)); then
 	echo "No experiments containing model.py and model_new.py were found under: $experiment_root" >&2
