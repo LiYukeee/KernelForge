@@ -27,6 +27,17 @@ def _positive_float_env(name: str, default: float) -> float:
     return value
 
 
+def _optional_positive_int_env(name: str) -> int | None:
+    """读取可选的正整数环境变量；未设置或为空时返回 None。"""
+    raw_value = os.getenv(name)
+    if raw_value is None or not raw_value.strip():
+        return None
+    value = int(raw_value)
+    if value <= 0:
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
 def load_model(*, streaming: bool = False):
     """创建项目共用的 DeepSeek 协议聊天模型。"""
     return init_chat_model(
@@ -38,4 +49,5 @@ def load_model(*, streaming: bool = False):
         stream_usage=streaming,
         max_retries=_nonnegative_int_env("MODEL_MAX_RETRIES", 2),
         timeout=_positive_float_env("MODEL_TIMEOUT_SECONDS", 180.0),
+        max_tokens=_optional_positive_int_env("MODEL_MAX_TOKENS"),
     )

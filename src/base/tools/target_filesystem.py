@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import tempfile
@@ -37,6 +38,54 @@ TARGET_FILESYSTEM_TOOL_NAMES = [
     "grep",
 ]
 
+# deepagents 中间件在驱逐超长工具结果 / 超长 HumanMessage 时写入的内部目录。
+# 这些路径必须对读写同时放行，否则驱逐写入会静默失败（保留原消息）。
+_EVICTION_INTERNAL_PATHS = (
+    "/large_tool_results",
+    "/large_tool_results/**",
+    "/conversation_history",
+    "/conversation_history/**",
+)
+
+# deepagents 以 4 字符 ≈ 1 token 的比例估算文本长度。
+_CHARS_PER_TOKEN = 4
+_DEFAULT_CONTEXT_WINDOW_TOKENS = 180_220
+# 为系统提示、工具定义与回复预留的 token 余量。
+_RESERVED_TOKENS = 32_768
+
+
+def context_window_tokens() -> int:
+    """读取 MODEL_CONTEXT_WINDOW；未设置、为空或非法时回退到默认值。"""
+    raw_value = os.getenv("MODEL_CONTEXT_WINDOW")
+    if raw_value is None or not raw_value.strip():
+        return _DEFAULT_CONTEXT_WINDOW_TOKENS
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise ValueError(
+            f"MODEL_CONTEXT_WINDOW must be a positive integer, got: {raw_value!r}"
+        ) from exc
+    if value <= 0:
+        raise ValueError(
+            f"MODEL_CONTEXT_WINDOW must be a positive integer, got: {raw_value!r}"
+        )
+    return value
+
+
+def eviction_limits_from_context_window() -> tuple[int, int]:
+    """根据模型上下文窗口推导 (tool, human) 驱逐阈值（token）。
+
+    设定原则：单个工具结果与单条 HumanMessage 都不应占用超过上下文的一小半，
+    这样即便叠加系统提示、历史消息与最大输出，也不会突破模型输入上限。
+    预留余量不会超过上下文窗口的 1/4，避免小窗口配置下阈值退化为 1。
+    """
+    context_window = context_window_tokens()
+    reserved = min(_RESERVED_TOKENS, context_window // 4)
+    budget = max(context_window - reserved, 1)
+    tool_limit = max(budget // 2, 1)
+    human_limit = max(budget // 2, 1)
+    return tool_limit, human_limit
+
 
 @dataclass(frozen=True)
 class TargetFilesystemPolicy:
@@ -44,6 +93,15 @@ class TargetFilesystemPolicy:
 
     read_paths: tuple[str, ...]
     write_paths: tuple[str, ...]
+
+
+def _with_eviction_paths(paths: tuple[str, ...]) -> tuple[str, ...]:
+    """附加 deepagents 驱逐机制使用的内部目录，保持去重与顺序稳定。"""
+    merged = list(paths)
+    for internal_path in _EVICTION_INTERNAL_PATHS:
+        if internal_path not in merged:
+            merged.append(internal_path)
+    return tuple(merged)
 
 
 def _render_policy_path(path: str, *, round_number: int, config_path: Path) -> str:
@@ -123,8 +181,8 @@ def load_target_filesystem_policy(
         rendered_paths[operation] = rendered
 
     return TargetFilesystemPolicy(
-        read_paths=rendered_paths["read"],
-        write_paths=rendered_paths["write"],
+        read_paths=_with_eviction_paths(rendered_paths["read"]),
+        write_paths=_with_eviction_paths(rendered_paths["write"]),
     )
 
 
@@ -399,12 +457,15 @@ def build_target_filesystem(
         round_number=round_number,
         policy=policy,
     )
+    # 依据 MODEL_CONTEXT_WINDOW（未设置时用模型默认值）推导驱逐阈值，
+    # 防止超长工具结果或用户消息把上下文撑爆。
+    tool_limit, human_limit = eviction_limits_from_context_window()
     middleware = FilesystemMiddleware(
         backend=backend,
         tools=TARGET_FILESYSTEM_TOOL_NAMES,
         custom_tool_descriptions=custom_tool_descriptions,
-        tool_token_limit_before_evict=None,
-        human_message_token_limit_before_evict=None,
+        tool_token_limit_before_evict=tool_limit,
+        human_message_token_limit_before_evict=human_limit,
         # DeepAgents 0.7.x 只在 create_deep_agent 上公开 permissions；普通
         # create_agent 需要通过中间件参数接入，因此把私有兼容点集中在这里。
         _permissions=permissions,
